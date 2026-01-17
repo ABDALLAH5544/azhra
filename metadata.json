@@ -1,0 +1,8 @@
+{
+  "name": "Copy of AZHRT - أزهرت",
+  "description": "منصة تعليمية متطورة تجمع بين المنهج العام والمنهج الأزهري بنظام تعلم ذكي وتلعيب متقدم.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
