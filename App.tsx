@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Track, Subject, User, View, Lesson, Chat, Message } from './types';
+import { Track, Subject, User, View, Lesson, Chat, UserRole } from './types';
 import { Header } from './Header';
 import { Navbar } from './Navbar';
 import { HomeView } from './HomeView';
@@ -9,75 +9,78 @@ import { ProfileView } from './ProfileView';
 import { LearnView } from './LearnView';
 import { ContestsView } from './ContestsView';
 import { CommunityView } from './CommunityView';
-import { Sparkles } from 'lucide-react';
-
-const MY_ID = 'user_me';
+import { GamesView } from './GamesView';
+import { AuthView } from './AuthView';
+import { NotificationsView } from './NotificationsView';
+import { ChatView } from './ChatView';
+import { AdminDashboard } from './AdminDashboard';
+import { ModeratorDashboard } from './ModeratorDashboard';
+import { updateGlobalUser } from './database';
 
 export default function App() {
   const [activeView, setActiveView] = useState<View>('home');
-  const [isChatActive, setIsChatActive] = useState(false);
-  const [user, setUser] = useState<User>({
-    id: MY_ID,
-    name: 'أحمد الأزهري',
-    phone: '01012345678',
-    password: 'password123',
-    track: Track.AZHAR,
-    points: 2450,
-    streak: 15,
-    level: 'نخبة (مستوى 25)',
-    completedLessons: [],
-    rank: 3,
-    avatar: 'https://picsum.photos/seed/myprofile/200',
-    friendIds: ['s1', 's2'],
-    pendingFriendRequests: [
-      { fromId: 's3', fromName: 'خديجة محمد', fromAvatar: 'https://picsum.photos/seed/khadi/100' }
-    ]
-  });
-  
+  const [user, setUser] = useState<User | null>(null);
   const [selectedSubject, setSelectedSubject] = useState<Subject | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [isNewUser, setIsNewUser] = useState(true);
+  const [selectedChat, setSelectedChat] = useState<Chat | null>(null);
   const mainContentRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
-    if (mainContentRef.current) {
-      mainContentRef.current.scrollTo({ top: 0, behavior: 'instant' });
+    const savedUser = localStorage.getItem('azhrt_user');
+    if (savedUser) {
+      setUser(JSON.parse(savedUser));
     }
-    // عند تغيير الواجهة، تأكد من إعادة تعيين حالة الشات
-    if (activeView !== 'community') {
-      setIsChatActive(false);
-    }
-  }, [activeView]);
+  }, []);
 
-  if (isNewUser) {
-    return (
-      <div className="h-screen w-full flex flex-col items-center justify-center p-6 bg-[#0A0A1A] overflow-hidden">
-        <div className="text-center mb-12 animate-in zoom-in duration-700">
-          <div className="w-24 h-24 bg-gradient-to-br from-cyan-400 to-blue-600 rounded-[30%] mx-auto mb-6 flex items-center justify-center shadow-[0_0_50px_rgba(0,255,255,0.2)]">
-            <Sparkles size={48} className="text-white" />
-          </div>
-          <h1 className="text-5xl font-black text-white mb-2 neon-text">أزهرت</h1>
-          <p className="text-slate-400 text-sm font-medium">تجربة تعليمية بمواصفات عالمية</p>
-        </div>
-        <div className="w-full max-w-sm space-y-4">
-          <button onClick={() => { setUser(p => ({...p, track: Track.GENERAL})); setIsNewUser(false); }} className="w-full p-6 rounded-3xl bg-slate-900 border border-slate-800 hover:border-cyan-400 group transition-all transform active:scale-95 shadow-xl">
-            <h3 className="text-xl font-bold text-white mb-1 group-hover:text-cyan-400 transition-colors">المنهج العام</h3>
-            <p className="text-[10px] text-slate-500 uppercase tracking-widest font-bold">Standard Track</p>
-          </button>
-          <button onClick={() => { setUser(p => ({...p, track: Track.AZHAR})); setIsNewUser(false); }} className="w-full p-6 rounded-3xl bg-slate-900 border border-slate-800 hover:border-blue-600 group transition-all transform active:scale-95 shadow-xl">
-            <h3 className="text-xl font-bold text-white mb-1 group-hover:text-blue-400 transition-colors">المنهج الأزهري</h3>
-            <p className="text-[10px] text-slate-500 uppercase tracking-widest font-bold">Al-Azhar Track</p>
-          </button>
-        </div>
-      </div>
-    );
+  useEffect(() => {
+    if (user) {
+      updateGlobalUser(user);
+    }
+  }, [user]);
+
+  const handleLogin = (loggedInUser: User) => {
+    setUser(loggedInUser);
+    setActiveView('home');
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('azhrt_user');
+    setUser(null);
+    setActiveView('home');
+  };
+
+  const completeLessonAction = (lessonId: string, pts: number) => {
+    if (!user) return;
+    setUser(prev => {
+      if (!prev) return null;
+      if (prev.completedLessons.includes(lessonId)) return prev;
+      const newPoints = prev.points + pts;
+      const newCompleted = [...prev.completedLessons, lessonId];
+      const newQuests = prev.dailyQuests.map(q => {
+        if (q.id === 'q1') {
+           return { ...q, progress: Math.min(q.goal, q.progress + 1), isCompleted: q.progress + 1 >= q.goal };
+        }
+        return q;
+      });
+      return { ...prev, points: newPoints, completedLessons: newCompleted, dailyQuests: newQuests };
+    });
+  };
+
+  const handleSelectChat = (chat: Chat) => {
+    setSelectedChat(chat);
+    setActiveView('chat');
+  };
+
+  if (!user) {
+    return <AuthView onLogin={handleLogin} />;
   }
 
+  const showNavAndHeader = activeView !== 'learn' && activeView !== 'chat' && activeView !== 'admin' && activeView !== 'moderator';
+
   return (
-    <div className="h-screen w-full max-w-lg mx-auto bg-[#0A0A1A] flex flex-col relative shadow-2xl overflow-hidden border-x border-slate-800/50">
-      {!isChatActive && <Header user={user} />}
+    <div className="h-screen w-full max-w-lg mx-auto bg-[#010103] flex flex-col relative shadow-[0_0_100px_rgba(0,0,0,1)] overflow-hidden border-x border-white/5 font-['Tajawal']">
+      {showNavAndHeader && <Header user={user} />}
       
-      <main ref={mainContentRef} className="flex-grow overflow-y-auto no-scrollbar relative bg-[#0A0A1A] scroll-smooth">
+      <main ref={mainContentRef} className={`flex-grow overflow-y-auto no-scrollbar relative bg-transparent scroll-smooth ${showNavAndHeader ? 'pb-36 pt-4' : ''}`}>
         {activeView === 'home' && (
           <HomeView 
             user={user} 
@@ -86,19 +89,55 @@ export default function App() {
           />
         )}
         {activeView === 'leaderboard' && <LeaderboardView currentUser={user} setView={setActiveView} />}
-        {activeView === 'profile' && <ProfileView user={user} setUser={setUser} setView={setActiveView} />}
-        {activeView === 'learn' && <LearnView user={user} setView={setActiveView} selectedSubject={selectedSubject} />}
+        {activeView === 'profile' && (
+          <ProfileView 
+            user={user} 
+            setUser={setUser as any} 
+            setView={setActiveView} 
+            onLogout={handleLogout}
+          />
+        )}
+        {activeView === 'learn' && (
+          <LearnView 
+            user={user} 
+            setView={setActiveView} 
+            selectedSubject={selectedSubject}
+            onLessonComplete={completeLessonAction}
+          />
+        )}
         {activeView === 'contests' && <ContestsView setView={setActiveView} />}
+        {activeView === 'games' && <GamesView user={user} setUser={setUser as any} setView={setActiveView} />}
         {activeView === 'community' && (
           <CommunityView 
             user={user} 
-            setUser={setUser} 
-            onChatStateChange={setIsChatActive} 
+            setUser={setUser as any} 
+            setView={setActiveView}
+            onSelectChat={handleSelectChat}
           />
+        )}
+        {activeView === 'notifications' && <NotificationsView setView={setActiveView} />}
+        {activeView === 'chat' && selectedChat && (
+          <ChatView 
+            user={user} 
+            chat={selectedChat} 
+            onBack={() => setActiveView('community')}
+            onUpdateChat={(updated) => setSelectedChat(updated)}
+          />
+        )}
+        {activeView === 'admin' && user.role === UserRole.ADMIN && (
+          <AdminDashboard user={user} onBack={() => setActiveView('home')} />
+        )}
+        {activeView === 'moderator' && (user.role === UserRole.MODERATOR || user.role === UserRole.ADMIN) && (
+          <ModeratorDashboard user={user} onBack={() => setActiveView('home')} />
         )}
       </main>
 
-      {!isChatActive && <Navbar activeView={activeView === 'contests' ? 'home' : activeView} setView={setActiveView} />}
+      {showNavAndHeader && (
+        <Navbar 
+          activeView={activeView} 
+          setView={setActiveView} 
+        />
+      )}
     </div>
   );
 }
